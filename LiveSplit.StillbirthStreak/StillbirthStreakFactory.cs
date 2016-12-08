@@ -11,7 +11,7 @@ namespace LiveSplit.StillbirthStreak {
 public class StillbirthStreakFactory:IComponentFactory {
     public string ComponentName { get { return "Stillbirth Streak"; } }
     public string Description { get { return "Keeps track of stillborn runs and displays them"; } }
-    public ComponentCategory Category { get{ return ComponentCategory.Media; } }
+    public ComponentCategory Category { get{ return ComponentCategory.Information; } }
 
     public IComponent Create(LiveSplitState State){ return new StillbirthStreakComponent(State); }
     

@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Xml;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Collections.Generic;
-using System.Diagnostics;
 
 using LiveSplit.UI;
 using LiveSplit.UI.Components;
@@ -16,10 +13,19 @@ namespace LiveSplit.StillbirthStreak {
 public class StillbirthStreakComponent:IComponent {
     public StillbirthStreakComponent(LiveSplitState State){
         Settings = new StillbirthStreakSettings();
+        Settings.OnStreakReset += OnStreakReset;
 
         this.State = State;
+        State.OnReset += OnRunReset;
 
-        Label = new InfoTextComponent("","");
+        PreviousSplitIndex = State.CurrentSplitIndex;
+        StreakLength = 0;
+
+        Label = new InfoTextComponent("","0");
+
+        ContextMenuControls = new Dictionary<String, Action>{
+            ["Reset Stillbirth Streak"] = OnStreakReset,
+        };
     }
 
     public Control GetSettingsControl(LayoutMode Mode){ return Settings; }
@@ -28,84 +34,96 @@ public class StillbirthStreakComponent:IComponent {
             
         SettingsHelper.CreateSetting(Document,Element,"Version","1.0.0");
 
+        SettingsHelper.CreateSetting(Document,Element,"TextColorEnabled",Settings.p_TextColorEnabled);
+
+        SettingsHelper.CreateSetting(Document,Element,"Description",Settings.p_Description);
+
+        SettingsHelper.CreateSetting(Document,Element,"BackgroundColor",Settings.p_BackgroundColor);
+        SettingsHelper.CreateSetting(Document,Element,"TextColor",Settings.p_TextColor);
+
         return Element;
     }
     public void SetSettings(XmlNode Node){
         var Element = (XmlElement)Node;
         
-        /*
-        Settings.p_TextColorEnabled = SettingsHelper.ParseBool(Element["HeaderTextColorEnabled"],Settings.p_HeaderTextColorEnabled);
-        Settings.p_TextFontEnabled = SettingsHelper.ParseBool(Element["HeaderTextFontEnabled"],Settings.p_HeaderTextFontEnabled);
+        Settings.p_TextColorEnabled = SettingsHelper.ParseBool(Element["TextColorEnabled"],Settings.p_TextColorEnabled);
         
-        Settings.p_Text = SettingsHelper.ParseString(Element["HeaderText"],Settings.p_HeaderText);
-        
-        Settings.p_TextFont = ParseFont(Element["HeaderTextFont"],Settings.p_HeaderTextFont);
+        Settings.p_Description = SettingsHelper.ParseString(Element["Description"],Settings.p_Description);
 
-        Settings.p_BackgroundColor = SettingsHelper.ParseColor(Element["HeaderBackgroundColor"],Settings.p_HeaderBackgroundColor);
-        Settings.p_TextColor = SettingsHelper.ParseColor(Element["HeaderTextColor"],Settings.p_HeaderTextColor);
-        */
+        Settings.p_BackgroundColor = SettingsHelper.ParseColor(Element["BackgroundColor"],Settings.p_BackgroundColor);
+        Settings.p_TextColor = SettingsHelper.ParseColor(Element["TextColor"],Settings.p_TextColor);
     }
 
-    private static Font ParseFont(XmlElement Element,Font Default){
-        if(Element == null) return Default;
-        return SettingsHelper.GetFontFromElement(Element);
-    }
-
-    private void Draw(Graphics g,float Width,float Height){
-        /*
-        Label.ForeColor = Settings.p_HeaderTextColorEnabled?Settings.p_HeaderTextColor:
-                                                                    State.LayoutSettings.TextColor;
-        Label.HorizontalAlignment = StringAlignment.Near;
-        Label.VerticalAlignment = StringAlignment.Center;
+    private void PrepareDraw(){
+        Label.NameLabel.ForeColor = Label.ValueLabel.ForeColor =
+            Settings.p_TextColorEnabled?Settings.p_TextColor:State.LayoutSettings.TextColor;
         
-        Label.X = 4;
-        Label.Y = 2;
-
-        Label.Width = Width;
-        Label.Height = Height-4;
-
-        Label.SetActualWidth(g);
-        Label.Font = Settings.p_HeaderTextFontEnabled?Settings.p_HeaderTextFont:State.LayoutSettings.TextFont;
-        
-        Label.HasShadow = State.LayoutSettings.DropShadows;
-        Label.ShadowColor = State.LayoutSettings.ShadowsColor;
-
-        g.FillRectangle(new SolidBrush(Settings.p_HeaderBackgroundColor),x,y,Width,Height);
-        */
-        Label.Draw(g);
+        Label.NameLabel.HasShadow = Label.ValueLabel.HasShadow = State.LayoutSettings.DropShadows;
+        Label.NameLabel.ShadowColor = Label.ValueLabel.ShadowColor = State.LayoutSettings.ShadowsColor;
     }
 
     public void DrawHorizontal(Graphics g,LiveSplitState State,float Height,Region ClipRegion){
-        //Draw(g,HorizontalWidth,Height);
+        PrepareDraw();
+
+        g.FillRectangle(new SolidBrush(Settings.p_BackgroundColor),0.0f,0.0f,HorizontalWidth,Height);
+
+        Label.DrawVertical(g,State,Height,ClipRegion);
     }
     public void DrawVertical(Graphics g,LiveSplitState State,float Width,Region ClipRegion){
-        //Draw(g,Width,VerticalHeight);
+        PrepareDraw();
+
+        g.FillRectangle(new SolidBrush(Settings.p_BackgroundColor),0.0f,0.0f,Width,VerticalHeight);
+
+        Label.DrawVertical(g,State,Width,ClipRegion);
     }
 
-    public void Update(IInvalidator Invalidator,LiveSplitState State,float Width,float Height,LayoutMode Mode){}
+    public void Update(IInvalidator Invalidator,LiveSplitState State,float Width,float Height,LayoutMode Mode){
+        PreviousSplitIndex = State.CurrentSplitIndex;
 
-    public string ComponentName { get { return "StillbirthStreak"; } }
+        Label.InformationName = Settings.p_Description;
+        Label.Update(Invalidator,State,Width,Height,Mode);
+    }
+
+    public string ComponentName => "Stillbirth Streak";
     
-    public float MinimumWidth  { get { return Label.MinimumWidth; } }
-    public float MinimumHeight { get { return Label.MinimumHeight; } }
+    public float MinimumWidth  => Label.MinimumWidth;
+    public float MinimumHeight => Label.MinimumHeight;
 
-    public float HorizontalWidth { get { return Label.HorizontalWidth; } }
-    public float VerticalHeight  { get { return Label.VerticalHeight;  } }
+    public float HorizontalWidth => Label.HorizontalWidth;
+    public float VerticalHeight  => Label.VerticalHeight;
 
-    public float PaddingLeft   { get { return Label.PaddingLeft;   } }
-    public float PaddingTop    { get { return Label.PaddingLeft;   } }
-    public float PaddingRight  { get { return Label.PaddingRight;  } }
-    public float PaddingBottom { get { return Label.PaddingBottom; } }
+    public float PaddingLeft   => Label.PaddingLeft;
+    public float PaddingTop    => Label.PaddingLeft;
+    public float PaddingRight  => Label.PaddingRight;
+    public float PaddingBottom => Label.PaddingBottom;
 
-    public IDictionary<string,Action> ContextMenuControls { get; protected set; }
+    public IDictionary<string,Action> ContextMenuControls { get; private set; }
+
+    public void Dispose(){
+        Settings.OnStreakReset -= OnStreakReset;
+
+        State.OnReset -= OnRunReset;
+    }
     
     private LiveSplitState State;
     private StillbirthStreakSettings Settings;
 
     private InfoTextComponent Label;
 
-    public void Dispose(){
-        ;
+    private int PreviousSplitIndex;
+    private int StreakLength;
+    
+    private void OnRunReset(object Sender,TimerPhase e){
+        if(PreviousSplitIndex == 0){
+            ++StreakLength;
+            Label.InformationValue = StreakLength.ToString();
+        }else{
+            OnStreakReset();
+        }
+    }
+    private void OnStreakReset(){
+        StreakLength = 0;
+        Label.InformationValue = "0";
     }
 }
 
